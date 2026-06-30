@@ -1,160 +1,264 @@
-// Frontend logic for the Godot MCP desktop manager. Uses the global Tauri API
-// (withGlobalTauri) to invoke Rust commands; degrades gracefully when opened in
-// a plain browser for layout work.
-
-const invoke = (cmd, args) => {
-  if (window.__TAURI__?.core?.invoke) return window.__TAURI__.core.invoke(cmd, args);
-  return Promise.reject(new Error('Tauri API unavailable (open this through the desktop app).'));
-};
+// Godot MCP desktop app frontend (no bundler; Tauri global API).
+const { invoke } = window.__TAURI__.core;
+const { listen } = window.__TAURI__.event;
 
 const $ = (id) => document.getElementById(id);
-const els = {
-  badge: $('status-badge'),
-  host: $('host'),
-  port: $('port'),
-  project: $('project'),
-  godotBin: $('godot-bin'),
-  start: $('start-btn'),
-  stop: $('stop-btn'),
-  url: $('server-url'),
-  copyUrl: $('copy-url'),
-  agentList: $('agent-list'),
-  addForm: $('add-agent'),
-  agentName: $('agent-name'),
-  agentCmd: $('agent-cmd'),
-  config: $('config-snippet'),
-  copyConfig: $('copy-config'),
-  logs: $('logs'),
-  follow: $('follow'),
-};
+const MAX_CONSOLE_LINES = 5000;
 
-let currentUrl = '';
-let httpSnippet = '';
+let settings = null;
+let agents = [];
+let running = false;
+let lastConfigPath = null;
 
-function setRunning(status) {
-  const running = !!status.running;
-  els.badge.textContent = running ? 'running' : 'stopped';
-  els.badge.className = `badge ${running ? 'badge-on' : 'badge-off'}`;
-  els.start.disabled = running;
-  els.stop.disabled = !running;
-  for (const input of [els.host, els.port, els.project, els.godotBin]) input.disabled = running;
-  currentUrl = status.url || '';
-  els.url.textContent = running ? currentUrl : '';
-  els.copyUrl.hidden = !running;
-  if (running && status.project_root) els.project.value = status.project_root;
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+function settingsFromForm() {
+  const parsedPort = parseInt($("port").value, 10);
+  const port = Number.isInteger(parsedPort) && parsedPort >= 1 && parsedPort <= 65535 ? parsedPort : 9820;
+  if (String(port) !== $("port").value.trim()) $("port").value = port;
+  return {
+    node_path: $("node_path").value.trim(),
+    // Not exposed in the UI: the app uses its embedded server. A manual
+    // value in settings.json is preserved as a power-user override.
+    server_entry: settings?.server_entry ?? "",
+    host: $("host").value,
+    port,
+    project_root: $("project_root").value.trim(),
+    godot_bin: $("godot_bin").value.trim(),
+  };
+}
+
+function fillForm(s) {
+  $("node_path").value = s.node_path;
+  $("host").value = s.host === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1";
+  $("port").value = s.port;
+  $("project_root").value = s.project_root;
+  $("godot_bin").value = s.godot_bin;
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    settings = settingsFromForm();
+    try {
+      await invoke("save_settings", { settings });
+    } catch (e) {
+      appendLog("meta", `Could not save settings: ${e}`);
+    }
+    refreshAgents();
+  }, 400);
+}
+
+// ---------------------------------------------------------------------------
+// Console
+// ---------------------------------------------------------------------------
+
+function appendLog(kind, line) {
+  const consoleEl = $("console");
+  const span = document.createElement("span");
+  let cls = "";
+  if (kind === "meta") cls = "log-meta";
+  else if (/ERROR|FATAL|✗|Exception/i.test(line)) cls = "log-err";
+  else if (/WARNING|WARN/i.test(line)) cls = "log-warn";
+  else if (/\btool godot_\w+ ->/.test(line)) cls = "log-tool";
+  span.className = cls;
+  span.textContent = line + "\n";
+  consoleEl.appendChild(span);
+  while (consoleEl.childNodes.length > MAX_CONSOLE_LINES) {
+    consoleEl.removeChild(consoleEl.firstChild);
+  }
+  if ($("autoscroll").checked) consoleEl.scrollTop = consoleEl.scrollHeight;
+}
+
+// ---------------------------------------------------------------------------
+// Server lifecycle
+// ---------------------------------------------------------------------------
+
+function setRunning(state, url) {
+  running = state;
+  const pill = $("status-pill");
+  pill.className = `pill ${state ? "running" : "stopped"}`;
+  pill.textContent = state ? "running" : "stopped";
+  $("start").disabled = state;
+  $("stop").disabled = !state;
+  $("host").disabled = state;
+  $("port").disabled = state;
+  $("url-display").textContent = state && url ? url : "";
 }
 
 async function refreshStatus() {
   try {
-    setRunning(await invoke('server_status'));
-  } catch {
-    /* ignore when not in app */
+    const status = await invoke("server_status");
+    setRunning(status.running, status.url);
+    if (status.running && status.url) {
+      try {
+        const health = await fetch(status.url.replace(/\/mcp$/, "/health"), { signal: AbortSignal.timeout(1500) });
+        if (health.ok) {
+          const h = await health.json();
+          $("status-pill").textContent = `running · ${h.tools} tools · pid ${status.pid}`;
+        }
+      } catch {
+        // health endpoint not reachable yet; keep basic status
+      }
+    }
+  } catch (e) {
+    appendLog("meta", `status check failed: ${e}`);
   }
 }
 
-async function refreshLogs() {
+async function startServer() {
+  settings = settingsFromForm();
+  await invoke("save_settings", { settings }).catch(() => {});
+  appendLog("meta", `Starting: ${settings.node_path} ${settings.server_entry || "(embedded server)"} --transport http --host ${settings.host} --port ${settings.port}`);
   try {
-    const lines = await invoke('server_logs', { tail: 300 });
-    els.logs.textContent = lines.join('\n');
-    if (els.follow.checked) els.logs.scrollTop = els.logs.scrollHeight;
-  } catch {
-    /* ignore */
+    const status = await invoke("start_server", { settings });
+    setRunning(status.running, status.url);
+  } catch (e) {
+    appendLog("meta", `Start failed: ${e}`);
   }
 }
 
-function agentRow(agent) {
-  const li = document.createElement('li');
-  li.className = 'agent';
-  li.innerHTML = `
-    <div class="agent-meta">
-      <span class="agent-name"><span class="dot ${agent.running ? 'on' : ''}"></span> ${escapeHtml(agent.name)}</span>
-    </div>
-    <div class="agent-actions">
-      <button class="primary small" data-act="launch" ${agent.running ? 'disabled' : ''}>Launch</button>
-      <button class="ghost small" data-act="stop" ${agent.running ? '' : 'disabled'}>Stop</button>
-      <button class="link" data-act="remove">remove</button>
-    </div>`;
-  li.querySelector('[data-act="launch"]').onclick = () => guard(invoke('launch_agent', { id: agent.id }));
-  li.querySelector('[data-act="stop"]').onclick = () => guard(invoke('stop_agent', { id: agent.id }));
-  li.querySelector('[data-act="remove"]').onclick = () => guard(invoke('remove_agent', { id: agent.id }));
-  return li;
+async function stopServer() {
+  try {
+    await invoke("stop_server");
+    appendLog("meta", "Server stopped.");
+  } catch (e) {
+    appendLog("meta", `Stop failed: ${e}`);
+  }
+  refreshStatus();
+}
+
+// ---------------------------------------------------------------------------
+// Agents
+// ---------------------------------------------------------------------------
+
+function renderAgents() {
+  const select = $("agent-select");
+  const previous = select.value;
+  select.innerHTML = "";
+  for (const a of agents) {
+    const opt = document.createElement("option");
+    opt.value = a.id;
+    const badges = [
+      a.installed ? "detected" : "not detected",
+      a.configured ? "✓ configured" : null,
+    ].filter(Boolean).join(", ");
+    opt.textContent = `${a.label} (${badges})`;
+    select.appendChild(opt);
+  }
+  if (previous && agents.some((a) => a.id === previous)) select.value = previous;
+  onAgentChange();
+}
+
+function selectedAgent() {
+  return agents.find((a) => a.id === $("agent-select").value);
+}
+
+function onAgentChange() {
+  const agent = selectedAgent();
+  if (!agent) return;
+  const mode = $("mode-select");
+  const httpOpt = mode.querySelector('option[value="http"]');
+  const stdioOpt = mode.querySelector('option[value="stdio"]');
+  httpOpt.disabled = !agent.supports_http;
+  stdioOpt.disabled = !agent.supports_stdio;
+  if (mode.selectedOptions[0]?.disabled) {
+    mode.value = agent.supports_http ? "http" : "stdio";
+  }
+  $("agent-note").textContent = `${agent.note} Config: ${agent.config_path}`;
 }
 
 async function refreshAgents() {
   try {
-    const agents = await invoke('list_agents');
-    els.agentList.replaceChildren(...agents.map(agentRow));
-  } catch {
-    /* ignore */
+    agents = await invoke("list_agents", { settings: settingsFromForm() });
+    renderAgents();
+  } catch (e) {
+    appendLog("meta", `agent detection failed: ${e}`);
   }
 }
 
-async function refreshConfig() {
+async function configureAgent() {
+  const agent = selectedAgent();
+  if (!agent) return;
+  const mode = $("mode-select").value;
   try {
-    const cfg = await invoke('client_config');
-    httpSnippet = JSON.stringify(cfg.http, null, 2);
-    els.config.textContent = httpSnippet;
-  } catch {
-    /* ignore */
+    const result = await invoke("configure_agent", {
+      settings: settingsFromForm(),
+      agentId: agent.id,
+      mode,
+    });
+    $("configure-result").classList.remove("hidden");
+    $("result-message").textContent = result.message;
+    $("result-paths").textContent =
+      `File: ${result.config_path}` +
+      (result.backup_path ? ` — backup saved to ${result.backup_path}` : "");
+    $("result-snippet").textContent = result.snippet;
+    lastConfigPath = result.wrote ? result.config_path : null;
+    $("reveal-config").disabled = !result.wrote;
+    appendLog("meta", `${result.wrote ? "Configured" : "Prepared snippet for"} ${agent.label} (${mode}).`);
+    if (mode === "http" && !running) {
+      appendLog("meta", "Note: the server is not running — start it before using the agent.");
+    }
+    refreshAgents();
+  } catch (e) {
+    $("configure-result").classList.remove("hidden");
+    $("result-message").textContent = `Error: ${e}`;
+    $("result-paths").textContent = "";
+    $("result-snippet").textContent = "";
+    $("reveal-config").disabled = true;
   }
 }
 
-async function guard(promise) {
-  try {
-    await promise;
-    await Promise.all([refreshStatus(), refreshAgents(), refreshConfig()]);
-  } catch (err) {
-    alert(err.message || String(err));
+// ---------------------------------------------------------------------------
+// Wiring
+// ---------------------------------------------------------------------------
+
+async function init() {
+  settings = await invoke("get_settings");
+  fillForm(settings);
+
+  await listen("server-log", (event) => {
+    appendLog(event.payload.stream, event.payload.line);
+  });
+  await listen("server-exit", (event) => {
+    appendLog("meta", `Server process exited (code ${event.payload ?? "unknown"}).`);
+    refreshStatus();
+  });
+
+  $("start").addEventListener("click", startServer);
+  $("stop").addEventListener("click", stopServer);
+  $("configure").addEventListener("click", configureAgent);
+  $("agent-select").addEventListener("change", onAgentChange);
+  $("clear-console").addEventListener("click", () => ($("console").innerHTML = ""));
+  $("copy-snippet").addEventListener("click", () => {
+    navigator.clipboard.writeText($("result-snippet").textContent ?? "");
+  });
+  $("reveal-config").addEventListener("click", () => {
+    if (lastConfigPath) invoke("reveal_path", { path: lastConfigPath }).catch(() => {});
+  });
+  $("browse").addEventListener("click", async () => {
+    try {
+      const dir = await window.__TAURI__.dialog.open({ directory: true, title: "Select Godot project root" });
+      if (dir) {
+        $("project_root").value = dir;
+        scheduleSave();
+      }
+    } catch (e) {
+      appendLog("meta", `Folder picker unavailable: ${e}`);
+    }
+  });
+  for (const id of ["host", "port", "project_root", "node_path", "godot_bin"]) {
+    $(id).addEventListener("input", scheduleSave);
+    $(id).addEventListener("change", scheduleSave);
   }
+
+  appendLog("meta", "Godot MCP desktop ready. Configure host/port, press Start, then connect your agents.");
+  await refreshStatus();
+  await refreshAgents();
+  setInterval(refreshStatus, 2500);
 }
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
-async function copyText(text, btn) {
-  try {
-    await navigator.clipboard.writeText(text);
-    const old = btn.textContent;
-    btn.textContent = 'copied!';
-    setTimeout(() => (btn.textContent = old), 1200);
-  } catch {
-    /* ignore */
-  }
-}
-
-els.start.onclick = () =>
-  guard(
-    invoke('start_server', {
-      host: els.host.value.trim() || '127.0.0.1',
-      port: Number(els.port.value) || 7878,
-      projectRoot: els.project.value.trim() || null,
-      godotBin: els.godotBin.value.trim() || null,
-    }),
-  );
-
-els.stop.onclick = () => guard(invoke('stop_server'));
-els.copyUrl.onclick = () => copyText(currentUrl, els.copyUrl);
-els.copyConfig.onclick = () => copyText(httpSnippet, els.copyConfig);
-
-els.addForm.onsubmit = (e) => {
-  e.preventDefault();
-  guard(
-    invoke('add_agent', { name: els.agentName.value.trim(), command: els.agentCmd.value.trim(), workingDir: null }).then(
-      () => {
-        els.agentName.value = '';
-        els.agentCmd.value = '';
-      },
-    ),
-  );
-};
-
-// Initial load + polling.
-refreshStatus();
-refreshAgents();
-refreshConfig();
-setInterval(() => {
-  refreshStatus();
-  refreshLogs();
-  refreshAgents();
-}, 1500);
+init().catch((e) => appendLog("meta", `init failed: ${e}`));

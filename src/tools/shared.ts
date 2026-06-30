@@ -12,6 +12,14 @@ import { log } from '../util/log.js';
 
 export type Server = McpServer;
 
+/** Names of every tool registered via `register`, for /health reporting. */
+const registeredToolNames = new Set<string>();
+
+/** Number of distinct tools the server exposes. */
+export function toolCount(): number {
+  return registeredToolNames.size;
+}
+
 export type ToolContent =
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string };
@@ -40,6 +48,7 @@ export interface ToolDefinition<Shape extends z.ZodRawShape> {
 
 /** Registers a tool, wrapping the handler so thrown errors become tool errors. */
 export function register<Shape extends z.ZodRawShape>(server: Server, def: ToolDefinition<Shape>): void {
+  registeredToolNames.add(def.name);
   const callback = async (args: unknown): Promise<CallToolResult> => {
     const started = Date.now();
     try {

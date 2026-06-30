@@ -9,6 +9,8 @@
 import http from 'node:http';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { SERVER_NAME, SERVER_VERSION } from './constants.js';
+import { toolCount } from './tools/shared.js';
 import { log } from './util/log.js';
 
 export interface HttpOptions {
@@ -38,12 +40,16 @@ function readBody(req: http.IncomingMessage): Promise<unknown> {
 export function startHttpServer(options: HttpOptions): Promise<http.Server> {
   const { host, port, createServer } = options;
 
+  // Build one server up front so the tool registry (used by /health) is
+  // populated before the first request arrives.
+  createServer();
+
   const httpServer = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
 
     if (req.method === 'GET' && url.pathname === '/health') {
       res.writeHead(200, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, server: 'godot-mcp-server' }));
+      res.end(JSON.stringify({ ok: true, server: SERVER_NAME, version: SERVER_VERSION, tools: toolCount() }));
       return;
     }
 
