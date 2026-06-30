@@ -63,13 +63,20 @@ pub fn resolve_server_entry(app: &tauri::AppHandle, configured: &str) -> String 
 fn detect_node() -> String {
     #[cfg(unix)]
     {
-        if let Ok(out) = Command::new("/bin/sh").args(["-lc", "command -v node"]).output() {
+        if let Ok(out) = Command::new("/bin/sh")
+            .args(["-lc", "command -v node"])
+            .output()
+        {
             let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
             if !path.is_empty() {
                 return path;
             }
         }
-        for candidate in ["/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node"] {
+        for candidate in [
+            "/opt/homebrew/bin/node",
+            "/usr/local/bin/node",
+            "/usr/bin/node",
+        ] {
             if PathBuf::from(candidate).exists() {
                 return candidate.to_string();
             }
@@ -142,7 +149,10 @@ fn is_legacy_default_entry(entry: &str) -> bool {
     if trimmed == default {
         return true;
     }
-    match (PathBuf::from(trimmed).canonicalize(), PathBuf::from(&default).canonicalize()) {
+    match (
+        PathBuf::from(trimmed).canonicalize(),
+        PathBuf::from(&default).canonicalize(),
+    ) {
         (Ok(a), Ok(b)) => a == b,
         _ => false,
     }
@@ -181,7 +191,12 @@ fn reveal_path(path: String) -> Result<(), String> {
     let result = Command::new("explorer").arg("/select,").arg(&path).spawn();
     #[cfg(all(unix, not(target_os = "macos")))]
     let result = Command::new("xdg-open")
-        .arg(PathBuf::from(&path).parent().map(|p| p.to_path_buf()).unwrap_or_default())
+        .arg(
+            PathBuf::from(&path)
+                .parent()
+                .map(|p| p.to_path_buf())
+                .unwrap_or_default(),
+        )
         .spawn();
     result.map(|_| ()).map_err(|e| e.to_string())
 }

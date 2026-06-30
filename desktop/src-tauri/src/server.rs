@@ -56,7 +56,12 @@ fn status_from(managed: &Option<Managed>) -> StatusPayload {
             url: Some(format!("http://{}:{}/mcp", display_host(&m.host), m.port)),
             uptime_seconds: Some(m.started_at.elapsed().as_secs()),
         },
-        None => StatusPayload { running: false, pid: None, url: None, uptime_seconds: None },
+        None => StatusPayload {
+            running: false,
+            pid: None,
+            url: None,
+            uptime_seconds: None,
+        },
     }
 }
 
@@ -92,7 +97,13 @@ pub async fn start_server(
 
     // Reclaim the port if a previous server was orphaned (app crash/force-kill).
     if let Some(note) = reclaim_orphaned_port(&settings.host, settings.port)? {
-        let _ = app.emit("server-log", LogEvent { stream: "stderr", line: note });
+        let _ = app.emit(
+            "server-log",
+            LogEvent {
+                stream: "stderr",
+                line: note,
+            },
+        );
     }
 
     let mut cmd = Command::new(&settings.node_path);
@@ -196,7 +207,12 @@ pub async fn stop_server(state: State<'_, ServerState>) -> Result<StatusPayload,
     if let Some(mut m) = managed {
         graceful_kill(&mut m.child);
     }
-    Ok(StatusPayload { running: false, pid: None, url: None, uptime_seconds: None })
+    Ok(StatusPayload {
+        running: false,
+        pid: None,
+        url: None,
+        uptime_seconds: None,
+    })
 }
 
 #[tauri::command]

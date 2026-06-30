@@ -24,7 +24,9 @@ impl Mode {
         match s {
             "http" => Ok(Mode::Http),
             "stdio" => Ok(Mode::Stdio),
-            other => Err(format!("Unknown mode '{other}'. Use \"http\" or \"stdio\".")),
+            other => Err(format!(
+                "Unknown mode '{other}'. Use \"http\" or \"stdio\"."
+            )),
         }
     }
 }
@@ -104,7 +106,10 @@ fn detect_dir(home: &Path, id: &str) -> PathBuf {
         "vscode" => app_support(home).join("Code").join("User"),
         "windsurf" => home.join(".codeium").join("windsurf"),
         "cline" => app_support(home)
-            .join("Code").join("User").join("globalStorage").join("saoudrizwan.claude-dev"),
+            .join("Code")
+            .join("User")
+            .join("globalStorage")
+            .join("saoudrizwan.claude-dev"),
         "zed" => home.join(".config").join("zed"),
         _ => home.to_path_buf(),
     }
@@ -113,13 +118,20 @@ fn detect_dir(home: &Path, id: &str) -> PathBuf {
 fn config_path(home: &Path, id: &str, project_root: &str) -> PathBuf {
     match id {
         "claude-code" => PathBuf::from(project_root).join(".mcp.json"),
-        "claude-desktop" => app_support(home).join("Claude").join("claude_desktop_config.json"),
+        "claude-desktop" => app_support(home)
+            .join("Claude")
+            .join("claude_desktop_config.json"),
         "codex" => home.join(".codex").join("config.toml"),
         "cursor" => home.join(".cursor").join("mcp.json"),
         "gemini" => home.join(".gemini").join("settings.json"),
         "vscode" => app_support(home).join("Code").join("User").join("mcp.json"),
-        "windsurf" => home.join(".codeium").join("windsurf").join("mcp_config.json"),
-        "cline" => detect_dir(home, "cline").join("settings").join("cline_mcp_settings.json"),
+        "windsurf" => home
+            .join(".codeium")
+            .join("windsurf")
+            .join("mcp_config.json"),
+        "cline" => detect_dir(home, "cline")
+            .join("settings")
+            .join("cline_mcp_settings.json"),
         "zed" => home.join(".config").join("zed").join("settings.json"),
         _ => home.to_path_buf(),
     }
@@ -138,13 +150,20 @@ fn top_key(id: &str) -> &'static str {
 // ---------------------------------------------------------------------------
 
 pub fn http_url(settings: &Settings) -> String {
-    format!("http://{}:{}/mcp", display_host(&settings.host), settings.port)
+    format!(
+        "http://{}:{}/mcp",
+        display_host(&settings.host),
+        settings.port
+    )
 }
 
 fn env_map(settings: &Settings) -> Map<String, Value> {
     let mut env = Map::new();
     if !settings.project_root.trim().is_empty() {
-        env.insert("GODOT_PROJECT_ROOT".into(), json!(settings.project_root.trim()));
+        env.insert(
+            "GODOT_PROJECT_ROOT".into(),
+            json!(settings.project_root.trim()),
+        );
     }
     if !settings.godot_bin.trim().is_empty() {
         env.insert("GODOT_BIN".into(), json!(settings.godot_bin.trim()));
@@ -206,9 +225,10 @@ fn json_entry(id: &str, mode: Mode, settings: &Settings) -> Option<Value> {
 /// once — re-configuring must not clobber the pristine original.
 fn backup(path: &Path) -> Result<Option<String>, String> {
     if path.exists() {
-        let backup_path = path.with_extension(
-            format!("{}.godot-mcp.bak", path.extension().and_then(|e| e.to_str()).unwrap_or("cfg")),
-        );
+        let backup_path = path.with_extension(format!(
+            "{}.godot-mcp.bak",
+            path.extension().and_then(|e| e.to_str()).unwrap_or("cfg")
+        ));
         if !backup_path.exists() {
             std::fs::copy(path, &backup_path)
                 .map_err(|e| format!("Could not create backup {}: {e}", backup_path.display()))?;
@@ -242,7 +262,8 @@ fn write_atomic(path: &Path, contents: &str) -> Result<(), String> {
         "{}.godot-mcp.tmp",
         path.extension().and_then(|e| e.to_str()).unwrap_or("cfg")
     ));
-    std::fs::write(&tmp, contents).map_err(|e| format!("Could not write {}: {e}", tmp.display()))?;
+    std::fs::write(&tmp, contents)
+        .map_err(|e| format!("Could not write {}: {e}", tmp.display()))?;
     std::fs::rename(&tmp, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         format!("Could not replace {}: {e}", path.display())
@@ -307,7 +328,11 @@ fn codex_table(settings: &Settings, mode: Mode) -> Table {
     t
 }
 
-pub fn merge_codex_config(path: &Path, settings: &Settings, mode: Mode) -> Result<Option<String>, String> {
+pub fn merge_codex_config(
+    path: &Path,
+    settings: &Settings,
+    mode: Mode,
+) -> Result<Option<String>, String> {
     let text = read_config(path, "")?;
     let mut doc: DocumentMut = text
         .parse()
@@ -397,7 +422,9 @@ pub async fn configure_agent(
         return Err(format!("{} does not support {:?} mode.", def.label, mode));
     }
     if agent_id == "claude-code" && settings.project_root.trim().is_empty() {
-        return Err("Claude Code is configured per project: set the Godot Project Root first.".into());
+        return Err(
+            "Claude Code is configured per project: set the Godot Project Root first.".into(),
+        );
     }
     if mode == Mode::Stdio && !PathBuf::from(&settings.server_entry).exists() {
         return Err(format!(
@@ -431,7 +458,11 @@ pub async fn configure_agent(
                 "Configured {} ({}). Restart or refresh the agent to pick up the new server.{}",
                 def.label,
                 mode_str,
-                if mode == Mode::Http { " Make sure the server is running in this app." } else { "" }
+                if mode == Mode::Http {
+                    " Make sure the server is running in this app."
+                } else {
+                    ""
+                }
             ),
         }),
         Err(err) => Ok(ConfigureResult {
@@ -479,24 +510,39 @@ mod tests {
         let entry = json_entry("cursor", Mode::Http, &settings()).unwrap();
         let backup = merge_json_config(&path, "mcpServers", "godot", entry).unwrap();
         assert!(backup.is_none());
-        let written: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert_eq!(written["mcpServers"]["godot"]["url"], "http://127.0.0.1:9820/mcp");
+        let written: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            written["mcpServers"]["godot"]["url"],
+            "http://127.0.0.1:9820/mcp"
+        );
     }
 
     #[test]
     fn merge_preserves_existing_servers_and_creates_backup() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("mcp.json");
-        std::fs::write(&path, r#"{"mcpServers":{"other":{"command":"x"}},"theme":"dark"}"#).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"mcpServers":{"other":{"command":"x"}},"theme":"dark"}"#,
+        )
+        .unwrap();
         let entry = json_entry("cursor", Mode::Stdio, &settings()).unwrap();
         let backup = merge_json_config(&path, "mcpServers", "godot", entry).unwrap();
         assert!(backup.is_some());
         assert!(PathBuf::from(backup.unwrap()).exists());
-        let written: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let written: Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(written["mcpServers"]["other"]["command"], "x");
         assert_eq!(written["theme"], "dark");
-        assert_eq!(written["mcpServers"]["godot"]["command"], "/usr/local/bin/node");
-        assert_eq!(written["mcpServers"]["godot"]["env"]["GODOT_PROJECT_ROOT"], "/games/mygame");
+        assert_eq!(
+            written["mcpServers"]["godot"]["command"],
+            "/usr/local/bin/node"
+        );
+        assert_eq!(
+            written["mcpServers"]["godot"]["env"]["GODOT_PROJECT_ROOT"],
+            "/games/mygame"
+        );
     }
 
     #[test]
@@ -508,14 +554,20 @@ mod tests {
         let err = merge_json_config(&path, "context_servers", "godot", entry).unwrap_err();
         assert!(err.contains("not plain JSON"));
         // original untouched
-        assert!(std::fs::read_to_string(&path).unwrap().contains("// a comment"));
+        assert!(std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("// a comment"));
     }
 
     #[test]
     fn codex_toml_merge_preserves_unrelated_content() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("config.toml");
-        std::fs::write(&path, "model = \"o5\"\n\n[mcp_servers.other]\ncommand = \"x\"\n").unwrap();
+        std::fs::write(
+            &path,
+            "model = \"o5\"\n\n[mcp_servers.other]\ncommand = \"x\"\n",
+        )
+        .unwrap();
         merge_codex_config(&path, &settings(), Mode::Stdio).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(text.contains("model = \"o5\""));
@@ -540,12 +592,30 @@ mod tests {
     #[test]
     fn entries_match_each_clients_dialect() {
         let s = settings();
-        assert_eq!(json_entry("gemini", Mode::Http, &s).unwrap()["httpUrl"], "http://127.0.0.1:9820/mcp");
-        assert_eq!(json_entry("windsurf", Mode::Http, &s).unwrap()["serverUrl"], "http://127.0.0.1:9820/mcp");
-        assert_eq!(json_entry("vscode", Mode::Http, &s).unwrap()["type"], "http");
-        assert_eq!(json_entry("vscode", Mode::Stdio, &s).unwrap()["type"], "stdio");
-        assert_eq!(json_entry("claude-desktop", Mode::Http, &s).unwrap()["command"], "npx");
-        assert_eq!(json_entry("cline", Mode::Stdio, &s).unwrap()["disabled"], false);
+        assert_eq!(
+            json_entry("gemini", Mode::Http, &s).unwrap()["httpUrl"],
+            "http://127.0.0.1:9820/mcp"
+        );
+        assert_eq!(
+            json_entry("windsurf", Mode::Http, &s).unwrap()["serverUrl"],
+            "http://127.0.0.1:9820/mcp"
+        );
+        assert_eq!(
+            json_entry("vscode", Mode::Http, &s).unwrap()["type"],
+            "http"
+        );
+        assert_eq!(
+            json_entry("vscode", Mode::Stdio, &s).unwrap()["type"],
+            "stdio"
+        );
+        assert_eq!(
+            json_entry("claude-desktop", Mode::Http, &s).unwrap()["command"],
+            "npx"
+        );
+        assert_eq!(
+            json_entry("cline", Mode::Stdio, &s).unwrap()["disabled"],
+            false
+        );
         assert!(json_entry("cline", Mode::Http, &s).is_none());
         assert!(json_entry("zed", Mode::Http, &s).is_none());
     }
@@ -556,7 +626,9 @@ mod tests {
         let path = dir.path().join("mcp.json");
         std::fs::write(&path, r#"{"mcpServers":{"original":true}}"#).unwrap();
         let e1 = json_entry("cursor", Mode::Http, &settings()).unwrap();
-        let bak = merge_json_config(&path, "mcpServers", "godot", e1).unwrap().unwrap();
+        let bak = merge_json_config(&path, "mcpServers", "godot", e1)
+            .unwrap()
+            .unwrap();
         // Reconfigure with a different mode: .bak must still hold the original.
         let e2 = json_entry("cursor", Mode::Stdio, &settings()).unwrap();
         merge_json_config(&path, "mcpServers", "godot", e2).unwrap();
@@ -598,7 +670,10 @@ mod tests {
         let zeta = text.find("zeta").unwrap();
         let servers = text.find("mcpServers").unwrap();
         let alpha = text.find("alpha").unwrap();
-        assert!(zeta < servers && servers < alpha, "key order was not preserved: {text}");
+        assert!(
+            zeta < servers && servers < alpha,
+            "key order was not preserved: {text}"
+        );
     }
 
     #[test]
