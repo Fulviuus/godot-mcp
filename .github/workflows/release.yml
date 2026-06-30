@@ -9,31 +9,8 @@ permissions:
   contents: write
 
 jobs:
-  server:
-    name: Package server
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - run: npm ci
-      - run: npm run build
-      - run: npm test
-      - run: npm pack
-
-      - name: Attach npm tarball to release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: '*.tgz'
-
   desktop:
     name: Desktop bundle (${{ matrix.platform }})
-    needs: server
     strategy:
       fail-fast: false
       matrix:
@@ -64,6 +41,8 @@ jobs:
           npm ci
           npm --prefix desktop ci
 
+      # tauri-action owns release creation: it creates the draft release for the
+      # tag on the first matrix job and uploads each platform's bundle to it.
       - name: Build desktop app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -72,5 +51,31 @@ jobs:
           projectPath: desktop
           tagName: ${{ github.ref_name }}
           releaseName: 'Godot MCP ${{ github.ref_name }}'
+          releaseBody: 'Desktop app (macOS / Linux / Windows) + bundled MCP server. Download the installer for your platform below. The npm package tarball is also attached.'
           releaseDraft: true
           prerelease: false
+
+  npm-asset:
+    name: Attach npm tarball
+    needs: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - run: npm pack
+
+      - name: Upload tarball and publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" *.tgz --clobber
+          # Everything (all platform installers + tarball) is attached now: go live.
+          gh release edit "${{ github.ref_name }}" --draft=false
