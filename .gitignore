@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Local caches (downloaded Godot binaries, export templates, refdocs)
+.cache/
+*.log
+
+# Godot project artifacts in the test fixture
+test/fixture/.godot/
+test/fixture/export/
+
+# Desktop (Tauri) build output
+desktop/node_modules/
+desktop/dist/
+desktop/src-tauri/target/
+desktop/src-tauri/resources/server.cjs
+desktop/src-tauri/gen/
+
+# OS files
+.DS_Store
+Thumbs.db

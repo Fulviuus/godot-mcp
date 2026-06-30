@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3 uid="uid://c0mainfixture00"]
+
+[ext_resource type="PackedScene" uid="uid://b1player0fixture" path="res://main/player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://main/world.gd" id="2_world"]
+
+[node name="Main" type="Node2D"]
+script = ExtResource("2_world")
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector2(320, 180)
+
+[node name="Camera2D" type="Camera2D" parent="Player"]
+
+[connection signal="died" from="Player" to="." method="_on_player_died"]

@@ -1,0 +1,16 @@
+{
+  "name": "godot-mcp-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Desktop manager for godot-mcp-server (Tauri).",
+  "scripts": {
+    "tauri": "tauri",
+    "bundle:server": "npm --prefix .. run bundle:server",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "icon": "tauri icon app-icon.png"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

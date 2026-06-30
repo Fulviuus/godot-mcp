@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Godot MCP</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">◆</span>
+        <div>
+          <h1>Godot MCP</h1>
+          <p class="subtitle">Server &amp; agent control panel</p>
+        </div>
+      </div>
+      <span id="status-badge" class="badge badge-off">stopped</span>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>Server</h2>
+        <div class="grid">
+          <label>Host<input id="host" value="127.0.0.1" /></label>
+          <label>Port<input id="port" type="number" value="7878" /></label>
+          <label class="wide">Project root<input id="project" placeholder="/path/to/your/godot/project" /></label>
+          <label class="wide">Godot binary (optional)<input id="godot-bin" placeholder="leave blank to auto-download" /></label>
+        </div>
+        <div class="row">
+          <button id="start-btn" class="primary">Start server</button>
+          <button id="stop-btn" class="ghost" disabled>Stop</button>
+          <span id="server-url" class="url"></span>
+          <button id="copy-url" class="link" hidden>copy</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Agents</h2>
+          <span class="hint">Templates support {url} {host} {port} {project}</span>
+        </div>
+        <ul id="agent-list" class="agent-list"></ul>
+        <form id="add-agent" class="add-agent">
+          <input id="agent-name" placeholder="Name" required />
+          <input id="agent-cmd" placeholder="Command, e.g. claude mcp add --transport http godot {url}" required />
+          <button type="submit" class="primary small">Add</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Client config</h2>
+          <button id="copy-config" class="link">copy http snippet</button>
+        </div>
+        <pre id="config-snippet" class="logs small"></pre>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Logs</h2>
+          <label class="follow"><input id="follow" type="checkbox" checked /> follow</label>
+        </div>
+        <pre id="logs" class="logs"></pre>
+      </section>
+    </main>
+
+    <script src="main.js"></script>
+  </body>
+</html>

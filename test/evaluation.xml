@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Agent evaluation scenarios for godot-mcp-server.
+
+  Each <task> is a natural-language request an AI agent might receive while
+  working in a Godot project, paired with the tools we expect a competent agent
+  to reach for and an assertion describing success. These are intended for an
+  agent-eval harness; they are not run by `npm test`.
+-->
+<evaluation server="godot-mcp-server" version="1.0.0" engine="Godot 4.7">
+  <suite name="project-understanding">
+    <task id="summarize-project">
+      <prompt>What is this Godot project and what scene does it start with?</prompt>
+      <expect-tools>godot_project_info</expect-tools>
+      <success>Reports the project name, engine version 4.7, and the main scene path.</success>
+    </task>
+    <task id="find-autoloads">
+      <prompt>List the autoload singletons and input actions configured in this project.</prompt>
+      <expect-tools>godot_project_info, godot_get_settings</expect-tools>
+      <success>Names the GameState autoload and the "jump" input action.</success>
+    </task>
+  </suite>
+
+  <suite name="resource-inspection">
+    <task id="outline-player">
+      <prompt>Outline the Player script: its signals, exported variables and methods.</prompt>
+      <expect-tools>godot_parse_resource</expect-tools>
+      <success>Lists health_changed/died signals, exported speed/jump_velocity, and take_damage().</success>
+    </task>
+    <task id="scene-structure">
+      <prompt>What nodes are in the main scene and how are they connected?</prompt>
+      <expect-tools>godot_parse_resource</expect-tools>
+      <success>Shows the Main/Player/Camera2D tree and the died -> _on_player_died connection.</success>
+    </task>
+    <task id="who-uses-player">
+      <prompt>Which resources depend on player.gd?</prompt>
+      <expect-tools>godot_find_references</expect-tools>
+      <success>Identifies player.tscn as referencing the script.</success>
+    </task>
+  </suite>
+
+  <suite name="editing">
+    <task id="add-setting">
+      <prompt>Set the project's default window width to 1280.</prompt>
+      <expect-tools>godot_set_setting</expect-tools>
+      <success>Writes display/window/size/viewport_width=1280 to project.godot without corrupting other settings.</success>
+    </task>
+    <task id="new-component">
+      <prompt>Create a new GDScript called HealthBar that extends Control.</prompt>
+      <expect-tools>godot_create_resource</expect-tools>
+      <success>Creates res://...HealthBar.gd with `extends Control`.</success>
+    </task>
+  </suite>
+
+  <suite name="build-and-run">
+    <task id="provision">
+      <prompt>Get this project ready to build with the right Godot version.</prompt>
+      <expect-tools>godot_setup, godot_doctor</expect-tools>
+      <success>Installs the matching editor + export templates and reports a clean doctor.</success>
+    </task>
+    <task id="compile-check">
+      <prompt>Does the project import and compile cleanly?</prompt>
+      <expect-tools>godot_build</expect-tools>
+      <success>Runs a headless import and reports success or specific diagnostics.</success>
+    </task>
+    <task id="export-linux">
+      <prompt>Export a Linux build using the configured preset.</prompt>
+      <expect-tools>godot_export</expect-tools>
+      <success>Produces the export output for the "Linux" preset.</success>
+    </task>
+  </suite>
+
+  <suite name="live-control">
+    <task id="run-and-inspect">
+      <prompt>Run the game and tell me what the current FPS and scene tree look like.</prompt>
+      <expect-tools>godot_run, godot_engine_info, godot_scene_tree</expect-tools>
+      <success>Launches with the bridge enabled and reports live FPS and node tree.</success>
+    </task>
+    <task id="tweak-live">
+      <prompt>While the game is running, move the player to position (100, 100).</prompt>
+      <expect-tools>godot_set_node_property, godot_eval</expect-tools>
+      <success>Mutates the running node's position via the bridge.</success>
+    </task>
+    <task id="hot-reload">
+      <prompt>I changed player.gd — reload it in the running game without restarting.</prompt>
+      <expect-tools>godot_hot_reload</expect-tools>
+      <success>Reloads the script in-engine and confirms it.</success>
+    </task>
+    <task id="screenshot">
+      <prompt>Show me what the game looks like right now.</prompt>
+      <expect-tools>godot_screenshot</expect-tools>
+      <success>Returns a PNG of the running game's viewport.</success>
+    </task>
+  </suite>
+
+  <suite name="documentation">
+    <task id="api-search">
+      <prompt>How do I make a 2D character move and collide? Find the relevant class.</prompt>
+      <expect-tools>godot_api_search, godot_api_doc</expect-tools>
+      <success>Surfaces CharacterBody2D and move_and_slide() for Godot 4.7.</success>
+    </task>
+  </suite>
+</evaluation>

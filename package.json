@@ -1,0 +1,46 @@
+{
+  "name": "godot-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for the Godot game engine: project inspection, project.godot editing, scene/resource parsing, headless exports, running games, live reload, remote engine control and API documentation search",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "godot-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "bundle:server": "esbuild src/index.ts --bundle --platform=node --format=cjs --target=node18 --outfile=desktop/src-tauri/resources/server.cjs",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist",
+    "test": "npm run build && node --test \"test/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "godot",
+    "game-engine",
+    "gdscript",
+    "godot-export",
+    "hot-reload"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "fflate": "^0.8.2",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.28.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
