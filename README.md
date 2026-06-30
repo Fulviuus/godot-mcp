@@ -7,11 +7,27 @@ running games with **live control** (eval, scene-tree inspection, hot reload and
 screenshots), and version-accurate API documentation search.
 
 It targets **Godot 4.7** and works without the editor open — agents drive Godot
-through its command line and a small in-game bridge.
+through its command line and a small in-game bridge. An optional desktop app
+manages the server and wires it into your AI agents in one click.
 
 > This is the Godot counterpart to
 > [defold-mcp](https://github.com/Fulviuus/defold-mcp), built with the same
 > architecture.
+
+---
+
+## Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Configuration](#configuration)
+- [Tools](#tools)
+- [The live-control bridge](#the-live-control-bridge)
+- [Desktop app](#desktop-app)
+- [Architecture](#architecture)
+- [Development](#development)
+- [License](#license)
 
 ## Features
 
@@ -30,6 +46,8 @@ through its command line and a small in-game bridge.
   version in use (generated locally via `--doctool`, with a GitHub fallback).
 - **Two transports** — stdio (default) or HTTP, so multiple agents can share one
   server.
+- **Desktop manager** — an optional Tauri app: live console, start/stop, and
+  one-click MCP setup for 9 AI agents.
 
 ## Requirements
 
@@ -50,7 +68,8 @@ npm test           # runs the test suite (optional)
 
 ## Configuration
 
-Add the server to your MCP client. For Claude Desktop / Claude Code style config:
+Add the server to your MCP client. For a stdio config (Claude Code / Claude
+Desktop style):
 
 ```json
 {
@@ -70,6 +89,19 @@ Or run it over HTTP (shared by multiple agents):
 node dist/index.js --transport http --port 7878
 # then point clients at http://127.0.0.1:7878/mcp
 ```
+
+> Don't want to edit config files by hand? The [desktop app](#desktop-app) writes
+> the right config into each agent for you.
+
+### CLI options
+
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--transport <stdio\|http>` | `stdio` | Transport to serve on. |
+| `--host <host>` | `127.0.0.1` | HTTP bind host. |
+| `--port <port>` | `7878` | HTTP bind port. |
+| `--exit-with-parent` | off | Exit when the controlling stdin/parent closes. |
+| `--version`, `--help` | — | Print version / usage. |
 
 ### Environment variables
 
@@ -123,12 +155,33 @@ speaking newline-delimited JSON. The server uses it for `godot_eval`,
 `godot_screenshot`. It is inert during normal runs and easy to remove (delete the
 `addons/godot_mcp` folder and the `MCPBridge` autoload).
 
+## Desktop app
+
+`desktop/` is an optional [Tauri](https://tauri.app) control panel (the Godot
+counterpart to the defold-mcp manager). It supervises the server and connects it
+to your agents without touching config files by hand:
+
+- **Console** — a live stream of everything the server does (tool calls, export
+  output, game logs, listener status).
+- **Server control** — start/stop the server in Streamable HTTP mode on a chosen
+  host/port (default `127.0.0.1:9820`), with a status pill showing the live tool
+  count and PID.
+- **Agent auto-configuration** — pick an agent and click **Configure**: the app
+  merges a `godot` entry into that agent's own MCP config file (backing it up
+  first) in the client's correct dialect, over HTTP or stdio. Supported agents:
+  Claude Code, Claude Desktop, OpenAI Codex, Cursor, Gemini CLI, VS Code
+  (Copilot), Windsurf, Cline, Zed. Files it can't safely edit (e.g. JSONC with
+  comments) are never modified — it shows a paste-ready snippet instead.
+
+The server is bundled into the app, so end users only need Node installed. See
+[desktop/README.md](desktop/README.md) to build and run it.
+
 ## Architecture
 
 ```
 src/
 ├── index.ts            Entry point: server construction, stdio/HTTP, lifecycle
-├── http.ts             Streamable HTTP transport
+├── http.ts             Streamable HTTP transport + /health
 ├── constants.ts        Versions, release-asset naming, cache locations
 ├── context.ts          Project-root resolution, res:// ↔ filesystem mapping
 ├── state.ts            Running-game registry + log buffers
@@ -147,12 +200,6 @@ export templates replace Defold's `bob.jar`; the text scene format replaces
 protobuf; GDScript/C# replace Lua; and the bridge replaces Defold's TCP engine
 service.
 
-## Desktop app
-
-`desktop/` contains an optional [Tauri](https://tauri.app) control panel that
-supervises the server (start/stop, status, logs) and launches agents pointed at
-it. See [desktop/README.md](desktop/README.md).
-
 ## Development
 
 ```bash
@@ -168,6 +215,12 @@ is covered by an opt-in smoke test that needs a real Godot install:
 ```bash
 node test/live-smoke.mjs            # uses a temp copy of the fixture
 node test/live-smoke.mjs /my/game   # or your own project
+```
+
+Desktop app (Rust/Tauri) tests:
+
+```bash
+cd desktop/src-tauri && cargo test   # config writers, merging, backups
 ```
 
 ## License
