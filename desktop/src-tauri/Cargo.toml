@@ -1,6 +1,6 @@
 [package]
 name = "godot-mcp-desktop"
-version = "1.0.0"
+version = "1.0.1"
 description = "Desktop manager for the Godot MCP server"
 edition = "2021"
 license = "MIT"
