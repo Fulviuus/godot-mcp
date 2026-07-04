@@ -10,6 +10,11 @@ It targets **Godot 4.7** and works without the editor open — agents drive Godo
 through its command line and a small in-game bridge. An optional desktop app
 manages the server and wires it into your AI agents in one click.
 
+It ships **180+ tools**: a native suite (28 `godot_*` tools for project/build/run/
+docs) plus a vendored **full-control suite** (154 `game_*`/scene/editor tools) for
+deep runtime and editor manipulation — see
+[Full-control tool suite](#full-control-tool-suite).
+
 > This is the Godot counterpart to
 > [defold-mcp](https://github.com/Fulviuus/defold-mcp), built with the same
 > architecture.
@@ -24,6 +29,7 @@ manages the server and wires it into your AI agents in one click.
 - [Configuration](#configuration)
 - [Tools](#tools)
 - [The live-control bridge](#the-live-control-bridge)
+- [Full-control tool suite](#full-control-tool-suite)
 - [Desktop app](#desktop-app)
 - [Architecture](#architecture)
 - [Development](#development)
@@ -112,13 +118,17 @@ node dist/index.js --transport http --port 7878
 | `GODOT_MCP_CACHE_DIR` | Where to cache editors/templates/docs (default `~/.cache/godot-mcp`). |
 | `GODOT_MCP_MONO` | Set to `1` to use the .NET/Mono build. |
 | `GODOT_MCP_LOG_LEVEL` | `debug` / `info` / `warn` / `error`. |
+| `GODOT_PATH` | Godot executable for the full-control suite (falls back to `GODOT_BIN`, then PATH). |
+| `GODOT_MCP_ADVANCED` | Set to `0` to disable the vendored full-control suite (register only the 28 native tools). |
 
 Most tools also accept a `project_root` and `version` argument to override the
 defaults per call.
 
 ## Tools
 
-28 tools across eight areas. Every tool accepts `response_format: "markdown" | "json"`.
+The **native suite** is 28 tools across eight areas. Every native tool accepts
+`response_format: "markdown" | "json"`. (The vendored full-control suite adds 154
+more — see the [next section](#full-control-tool-suite).)
 
 | Area | Tools |
 | --- | --- |
@@ -154,6 +164,37 @@ speaking newline-delimited JSON. The server uses it for `godot_eval`,
 `godot_scene_tree`, `godot_set_node_property`, `godot_hot_reload` and
 `godot_screenshot`. It is inert during normal runs and easy to remove (delete the
 `addons/godot_mcp` folder and the `MCPBridge` autoload).
+
+## Full-control tool suite
+
+Alongside the native tools, the server registers a **154-tool full-control
+suite** vendored from [tugcantopaloglu/godot-mcp](https://github.com/tugcantopaloglu/godot-mcp)
+(MIT), which extends [Coding-Solo/godot-mcp](https://github.com/Coding-Solo/godot-mcp)
+(MIT). It gives agents deep runtime and editor manipulation across networking,
+3D/2D rendering, UI controls, audio, animation trees, physics, signals, file
+I/O, runtime GDScript `eval`, node inspection/mutation, project creation and
+more. Names are unprefixed (`game_eval`, `run_project`, `read_scene`,
+`game_set_property`, `game_raycast`, `game_light_3d`, …) so they never collide
+with the `godot_*` native tools.
+
+It works through two channels, both driven by Godot-side engines shipped with the
+server (`src/advanced/scripts/`):
+
+- **Headless operations** (`godot_operations.gd`) — scene/resource/file/project
+  tools run `godot --headless --script godot_operations.gd`; no running game
+  needed.
+- **Live interaction** (`mcp_interaction_server.gd`) — the ~120 `game_*` runtime
+  tools talk to a TCP autoload (port **9090**) inside the running game. Call
+  `run_project` to launch the game; it installs that autoload and connects
+  automatically. (This is separate from the native `godot_run` bridge; use the
+  suite that matches the tools you're calling.)
+
+Set `GODOT_MCP_ADVANCED=0` to register only the 28 native tools. Point the suite
+at your engine with `GODOT_PATH` (or reuse `GODOT_BIN`).
+
+> Attribution and license terms for the vendored code are in
+> [NOTICE](NOTICE); the vendored files carry source headers and everything is
+> MIT-licensed.
 
 ## Desktop app
 
@@ -223,6 +264,18 @@ Desktop app (Rust/Tauri) tests:
 cd desktop/src-tauri && cargo test   # config writers, merging, backups
 ```
 
+## Credits
+
+- The **full-control tool suite** (`src/advanced/`) is vendored from
+  [godot-mcp](https://github.com/tugcantopaloglu/godot-mcp) by
+  [Tugcan Topaloglu](https://github.com/tugcantopaloglu), which extends
+  [godot-mcp](https://github.com/Coding-Solo/godot-mcp) by
+  [Solomon Elias (Coding-Solo)](https://github.com/Coding-Solo). Both are MIT
+  licensed. See [NOTICE](NOTICE).
+- The native suite, transports, toolchain automation, tests, desktop app and
+  packaging are original to this project, which mirrors the architecture of
+  [defold-mcp](https://github.com/Fulviuus/defold-mcp).
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Vendored components are MIT; see [NOTICE](NOTICE).

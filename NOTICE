@@ -1,0 +1,35 @@
+godot-mcp-server
+Copyright (c) 2026 Fulvio
+
+This product includes software vendored from third-party MIT-licensed projects.
+
+--------------------------------------------------------------------------------
+Full-control tool suite  (src/advanced/)
+--------------------------------------------------------------------------------
+
+The 150+ "full control" tools — the vendored `GodotServer` (src/advanced/
+godot-server.ts), the shared utilities (src/advanced/utils.ts), and the two
+Godot-side engines (src/advanced/scripts/godot_operations.gd and
+src/advanced/scripts/mcp_interaction_server.gd) — are vendored from:
+
+  godot-mcp by Tugcan Topaloglu
+  https://github.com/tugcantopaloglu/godot-mcp
+  Licensed under the MIT License.
+
+which itself extends:
+
+  godot-mcp by Solomon Elias (Coding-Solo)
+  https://github.com/Coding-Solo/godot-mcp
+  Licensed under the MIT License.
+
+The TypeScript sources were adapted only to embed them into this server: the
+standalone MCP bootstrap (stdio transport, ListTools/CallTool request handlers,
+process entry point) was removed, and the tool list is exposed via
+`getToolDefinitions()` and `callTool(name, args)` so this server can register and
+dispatch them through its own transport layer. The GDScript engines are
+unmodified apart from an attribution header. All original copyright and license
+notices are retained.
+
+The MIT License text applies to the vendored portions; a full copy is in the
+LICENSE file at the repository root, which covers this project under the same
+terms.

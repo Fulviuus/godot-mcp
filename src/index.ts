@@ -21,6 +21,7 @@ import { registerEngineTools } from './tools/engine.js';
 import { registerEditorTools } from './tools/editor.js';
 import { registerScreenshotTools } from './tools/screenshot.js';
 import { registerDocTools } from './tools/docs.js';
+import { registerAdvancedTools, shutdownAdvanced } from './tools/advanced.js';
 
 /** Construct a fully-registered server instance. */
 export function createServer(): McpServer {
@@ -40,6 +41,10 @@ export function createServer(): McpServer {
   registerEditorTools(server);
   registerScreenshotTools(server);
   registerDocTools(server);
+  // Vendored "full control" suite (149+ game_*/scene/editor tools). Set
+  // GODOT_MCP_ADVANCED=0 to register only the native tools above.
+  const advancedCount = registerAdvancedTools(server);
+  log.debug(`registered ${advancedCount} advanced tools`);
   return server;
 }
 
@@ -142,6 +147,7 @@ async function main(): Promise<void> {
     shuttingDown = true;
     log.info(`shutting down (${reason})`);
     await runtime.killAll();
+    await shutdownAdvanced();
     if (httpServer) await new Promise<void>((r) => httpServer!.close(() => r()));
     process.exit(0);
   };

@@ -15,6 +15,7 @@ desktop/node_modules/
 desktop/dist/
 desktop/src-tauri/target/
 desktop/src-tauri/resources/server.cjs
+desktop/src-tauri/resources/scripts/
 desktop/src-tauri/gen/
 
 # OS files
