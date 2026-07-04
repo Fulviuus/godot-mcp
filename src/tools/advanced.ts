@@ -38,6 +38,7 @@ interface JsonSchema {
 }
 
 let singleton: GodotServer | null = null;
+let detection: Promise<void> | null = null;
 
 /** Lazily construct the shared GodotServer, honouring GODOT_BIN as GODOT_PATH. */
 function getGodotServer(): GodotServer {
@@ -45,9 +46,26 @@ function getGodotServer(): GodotServer {
     if (process.env.GODOT_BIN && !process.env.GODOT_PATH) {
       process.env.GODOT_PATH = process.env.GODOT_BIN;
     }
-    singleton = new GodotServer();
+    // Seed the Godot path from env so process-launching tools (run_project,
+    // launch_editor) have it immediately; the constructor validates it.
+    const godotPath = process.env.GODOT_PATH || process.env.GODOT_BIN;
+    singleton = new GodotServer(godotPath ? { godotPath } : undefined);
   }
   return singleton;
+}
+
+/**
+ * Ensure the Godot executable has been resolved once. The embedded server no
+ * longer runs the original startup routine that did this, and some handlers
+ * (run_project, launch_editor) spawn Godot directly rather than through the
+ * lazily-detecting operation runner. detectGodotPath is idempotent.
+ */
+function ensureGodotDetected(godot: GodotServer): Promise<void> {
+  if (!detection) {
+    const detect = (godot as unknown as { detectGodotPath?: () => Promise<void> }).detectGodotPath;
+    detection = detect ? detect.call(godot).catch(() => undefined) : Promise.resolve();
+  }
+  return detection;
 }
 
 /** Convert a single JSON-Schema property node into a Zod type. */
@@ -122,7 +140,10 @@ export function registerAdvancedTools(server: Server): number {
         title: def.name,
         description: def.description,
         schema: jsonSchemaToShape(def.inputSchema),
-        handler: async (args) => (await godot.callTool(def.name, args)) as ToolResult,
+        handler: async (args) => {
+          await ensureGodotDetected(godot);
+          return (await godot.callTool(def.name, args)) as ToolResult;
+        },
       });
       count++;
     } catch (err) {

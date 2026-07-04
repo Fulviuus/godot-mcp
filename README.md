@@ -182,7 +182,8 @@ server (`src/advanced/scripts/`):
 
 - **Headless operations** (`godot_operations.gd`) — scene/resource/file/project
   tools run `godot --headless --script godot_operations.gd`; no running game
-  needed.
+  needed. (Scene ops like `read_scene` need the project imported once — open it
+  in the editor, or run `godot_build` / `godot --import`.)
 - **Live interaction** (`mcp_interaction_server.gd`) — the ~120 `game_*` runtime
   tools talk to a TCP autoload (port **9090**) inside the running game. Call
   `run_project` to launch the game; it installs that autoload and connects

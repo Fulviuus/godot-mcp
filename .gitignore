@@ -21,3 +21,7 @@ desktop/src-tauri/gen/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Godot-generated per-resource metadata in the test fixture
+test/fixture/**/*.uid
+test/fixture/**/*.import
