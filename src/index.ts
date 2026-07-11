@@ -146,9 +146,20 @@ async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info(`shutting down (${reason})`);
-    await runtime.killAll();
-    await shutdownAdvanced();
-    if (httpServer) await new Promise<void>((r) => httpServer!.close(() => r()));
+    // Hard-exit backstop: never linger holding the port if a close() stalls on
+    // keep-alive connections. Guarantees SIGTERM/parent-death frees the port.
+    setTimeout(() => process.exit(0), 1500).unref();
+    try {
+      await runtime.killAll();
+      await shutdownAdvanced();
+      if (httpServer) {
+        // Force lingering keep-alive sockets closed so close() can complete.
+        httpServer.closeAllConnections?.();
+        await new Promise<void>((r) => httpServer!.close(() => r()));
+      }
+    } catch {
+      /* best effort — the hard-exit timer will finish the job */
+    }
     process.exit(0);
   };
 

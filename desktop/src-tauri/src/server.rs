@@ -272,10 +272,18 @@ fn reclaim_orphaned_port(host: &str, port: u16) -> Result<Option<String>, String
                 .map(|s| s.to_string())
                 .collect();
             if !pids.is_empty() {
+                // SIGTERM first (lets the server stop launched games), then
+                // escalate to SIGKILL if the port is still held.
                 for pid in &pids {
                     let _ = Command::new("kill").arg(pid).status();
                 }
-                std::thread::sleep(Duration::from_millis(600));
+                std::thread::sleep(Duration::from_millis(500));
+                if TcpStream::connect_timeout(&addr, Duration::from_millis(300)).is_ok() {
+                    for pid in &pids {
+                        let _ = Command::new("kill").args(["-9", pid]).status();
+                    }
+                    std::thread::sleep(Duration::from_millis(400));
+                }
                 return Ok(Some(format!(
                     "[app] stopped an orphaned godot-mcp server (pid {}) to free port {port}",
                     pids.join(", ")
