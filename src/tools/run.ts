@@ -96,10 +96,10 @@ export function registerRunTools(server: Server): void {
       let bridgePort: number | undefined;
       const env: NodeJS.ProcessEnv = {};
       if (live) {
-        if (!(await isBridgeInstalled(root))) {
-          await installBridge(root);
-          log.info('auto-installed godot_mcp bridge for live run');
-        }
+        // Always (re)install so an existing project picks up bridge fixes.
+        const hadBridge = await isBridgeInstalled(root);
+        await installBridge(root);
+        log.info(hadBridge ? 'refreshed godot_mcp bridge for live run' : 'installed godot_mcp bridge for live run');
         bridgePort = await getFreePort();
         env.GODOT_MCP_BRIDGE_PORT = String(bridgePort);
       }

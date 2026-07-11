@@ -157,7 +157,7 @@ func _handle_line(line: String) -> void:
 		_reply({"ok": false, "error": "invalid request"})
 		return
 	var id = parsed.get("id", null)
-	var reply := _dispatch(parsed)
+	var reply: Dictionary = await _dispatch(parsed)
 	if id != null:
 		reply["id"] = id
 	_reply(reply)
@@ -172,7 +172,7 @@ func _dispatch(req: Dictionary) -> Dictionary:
 		"scene_tree":
 			return {"ok": true, "tree": _dump_tree(get_tree().current_scene, int(req.get("max_depth", 100)))}
 		"eval":
-			return _eval(String(req.get("expression", "")))
+			return await _eval(String(req.get("expression", "")))
 		"set_property":
 			return _set_property(String(req.get("node", "")), String(req.get("property", "")), req.get("value"))
 		"reload":
@@ -214,17 +214,40 @@ func _dump_tree(node: Node, max_depth: int, depth: int = 0) -> Dictionary:
 	return data
 
 func _eval(expression: String) -> Dictionary:
-	if expression.strip_edges() == "":
+	var trimmed := expression.strip_edges()
+	if trimmed == "":
 		return {"ok": false, "error": "empty expression"}
-	var expr := Expression.new()
-	var err := expr.parse(expression, ["tree", "root", "scene"])
+	# Compile the code as a real GDScript so autoload singletons (e.g. GameState),
+	# method calls and await all work -- Godot's Expression class supports none
+	# of those. A bare expression is auto-wrapped in a return; multi-line code or
+	# code that returns runs as-is. The tree/root/scene locals stay available for
+	# compatibility.
+	var body: String
+	if trimmed.contains("\n") or trimmed.begins_with("return") or trimmed.contains(";"):
+		body = _indent_code(expression)
+	else:
+		body = "\treturn " + trimmed + "\n"
+	var src := "extends Node\n\nfunc _run():\n\t@warning_ignore(\"unused_variable\")\n\tvar tree := get_tree()\n\t@warning_ignore(\"unused_variable\")\n\tvar root := get_tree().root\n\t@warning_ignore(\"unused_variable\")\n\tvar scene := get_tree().current_scene\n" + body
+	var gd := GDScript.new()
+	gd.source_code = src
+	var err := gd.reload()
 	if err != OK:
-		return {"ok": false, "error": "parse error: " + expr.get_error_text()}
-	var scene := get_tree().current_scene
-	var result = expr.execute([get_tree(), get_tree().root, scene], self, true)
-	if expr.has_execute_failed():
-		return {"ok": false, "error": "execute failed: " + expr.get_error_text()}
+		return {"ok": false, "error": "compile error (%d) — check syntax" % err}
+	var temp := Node.new()
+	temp.set_script(gd)
+	temp.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(temp)
+	var result = null
+	if temp.has_method("_run"):
+		result = await temp._run()
+	temp.queue_free()
 	return {"ok": true, "result": str(result)}
+
+func _indent_code(code: String) -> String:
+	var out := ""
+	for line in code.split("\n"):
+		out += "\t" + line + "\n"
+	return out
 
 func _set_property(node_path: String, property: String, value) -> Dictionary:
 	var node := get_node_or_null(NodePath(node_path))

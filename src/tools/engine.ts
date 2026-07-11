@@ -91,12 +91,12 @@ export function registerEngineTools(server: Server): void {
 
   register(server, {
     name: 'godot_eval',
-    title: 'Evaluate expression',
+    title: 'Evaluate GDScript',
     description:
-      'Evaluate a Godot Expression in the running game and return the result as a string. The inputs "tree" (SceneTree), "root" (the window) and "scene" (current scene root) are available, and self refers to the bridge node. Example: "scene.get_node(\\"Player\\").position".',
+      'Run GDScript in the running game and return the result as a string. The code is compiled as a real script, so autoload singletons (e.g. GameState), method calls and `await` all work. A bare expression is auto-wrapped to return its value; multi-line code should `return` explicitly. The locals `tree` (SceneTree), `root` (Window) and `scene` (current scene) are provided. Examples: "GameState.last_health", "scene.get_node(\\"Player\\").position", "return await some_node.some_async()".',
     schema: {
       game_id: gameIdParam,
-      expression: z.string().min(1).describe('A Godot Expression to evaluate.'),
+      expression: z.string().min(1).describe('GDScript to run: a bare expression, or statements ending in `return`.'),
       response_format: responseFormatParam,
     },
     annotations: {},

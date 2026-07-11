@@ -26,6 +26,7 @@ import {
   templatesDirName,
 } from '../dist/constants.js';
 import { normalizeResourcePath, resourceToAbsolute, absoluteToResource } from '../dist/context.js';
+import { BRIDGE_AUTOLOAD_GD } from '../dist/services/templates.js';
 
 const read = (p) => readFileSync(path.join(FIXTURE, p), 'utf8');
 
@@ -132,6 +133,13 @@ test('constants: release asset names match Godot conventions', () => {
   assert.equal(templatesAssetName(spec, true), 'Godot_v4.7-stable_mono_export_templates.tpz');
   assert.equal(templatesDirName(spec, false), '4.7.stable');
   assert.equal(templatesDirName(spec, true), '4.7.stable.mono');
+});
+
+test('bridge: eval compiles real GDScript (not the limited Expression class)', () => {
+  // Regression guard for autoload/method-call support in godot_eval.
+  assert.ok(BRIDGE_AUTOLOAD_GD.includes('GDScript.new()'), 'eval must compile a GDScript');
+  assert.ok(BRIDGE_AUTOLOAD_GD.includes('func _eval'), 'bridge exposes _eval');
+  assert.ok(!/expr\s*:=\s*Expression\.new\(\)/.test(BRIDGE_AUTOLOAD_GD), 'eval must not use Expression');
 });
 
 test('context: resource path conversion round-trips and blocks traversal', () => {
