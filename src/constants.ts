@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export const SERVER_NAME = 'godot-mcp-server';
-export const SERVER_VERSION = '2.0.1';
+export const SERVER_VERSION = '2.0.2';
 
 /** Environment variables understood by the server. */
 export const ENV = {
