@@ -1,6 +1,6 @@
 {
   "name": "godot-mcp-server",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "MCP server for the Godot game engine: project inspection, project.godot editing, scene/resource parsing, headless exports, running games, live reload, remote engine control and API documentation search",
   "license": "MIT",
   "type": "module",
